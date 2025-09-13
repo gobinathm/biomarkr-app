@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Onboarding } from './components/Onboarding';
 import { VaultManager } from './components/VaultManager';
@@ -14,6 +15,9 @@ import { AlertModal, useAlert } from './components/AlertModal';
 import { PassphraseModal } from './components/PassphraseModal';
 import { ExportModal } from './components/ExportModal';
 import { ConfirmModal, useConfirm } from './components/ConfirmModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { TermsOfUseModal } from './components/TermsOfUseModal';
+import { LandingPage } from './components/LandingPage';
 import { useDraftManager } from './utils/draftManager';
 import { useSettings } from './contexts/SettingsContext';
 import { isDemoMode, disableDemoMode, forceDemoMode } from './data/mockData';
@@ -39,7 +43,9 @@ import {
   Users,
   PlayCircle,
   AlertTriangle,
-  Clock
+  Clock,
+  Heart,
+  Scale
 } from 'lucide-react';
 
 type Section = 'home' | 'results' | 'trends' | 'reminders' | 'storage' | 'settings';
@@ -73,11 +79,26 @@ interface TestResult {
 }
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [showLandingPage, setShowLandingPage] = useState(false);
   const [isFirstRun, setIsFirstRun] = useState(true);
   const [isVaultLocked, setIsVaultLocked] = useState(false);
-  const [currentSection, setCurrentSection] = useState<Section>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Get current section from URL path
+  const getCurrentSection = (): Section => {
+    const path = location.pathname;
+    if (path === '/results') return 'results';
+    if (path === '/trends') return 'trends';
+    if (path === '/reminders') return 'reminders';
+    if (path === '/storage') return 'storage';
+    if (path === '/settings') return 'settings';
+    return 'home';
+  };
+  
+  const currentSection = getCurrentSection();
   
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [showResultDetails, setShowResultDetails] = useState(false);
@@ -143,6 +164,7 @@ function App() {
   useEffect(() => {
     const hasCompletedOnboarding = localStorage.getItem('biomarkr-onboarded');
     const isRestoringFromBackup = localStorage.getItem('biomarkr-restoring-from-backup');
+    const hasSeenLandingPage = localStorage.getItem('biomarkr-seen-landing');
     
     // If restoring from backup, show the storage page instead of onboarding
     if (isRestoringFromBackup) {
@@ -150,9 +172,16 @@ function App() {
       localStorage.setItem('biomarkr-onboarded', 'true');
       localStorage.setItem('biomarkr-show-restore-help', 'true');
       setIsFirstRun(false);
-      setCurrentSection('storage');
+      setShowLandingPage(false);
+      navigate('/storage');
+    } else if (!hasSeenLandingPage && !hasCompletedOnboarding) {
+      // Show landing page for completely new users
+      setShowLandingPage(true);
+      setIsFirstRun(false);
+      navigate('/welcome');
     } else {
       setIsFirstRun(!hasCompletedOnboarding);
+      setShowLandingPage(false);
     }
     
     // Load vault settings
@@ -185,6 +214,16 @@ function App() {
       // Error saving vault settings
     }
   }, [hasPassphrase, autoLockEnabled, autoLockMinutes]);
+  
+  // Handle initial routing based on app state
+  useEffect(() => {
+    if (showLandingPage && location.pathname !== '/welcome') {
+      navigate('/welcome', { replace: true });
+    } else if (isFirstRun && location.pathname !== '/onboarding' && !showLandingPage && !isDemoMode()) {
+      // Don't redirect demo users to onboarding
+      navigate('/onboarding', { replace: true });
+    }
+  }, [showLandingPage, isFirstRun, location.pathname, navigate]);
 
   // Load profiles for profile switcher
   useEffect(() => {
@@ -242,17 +281,35 @@ function App() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showProfileSwitcher]);
 
+  const handleGetStarted = () => {
+    localStorage.setItem('biomarkr-seen-landing', 'true');
+    setShowLandingPage(false);
+    setIsFirstRun(true);
+    navigate('/');
+  };
+
+  const handleStartDemo = () => {
+    localStorage.setItem('biomarkr-seen-landing', 'true');
+    localStorage.setItem('biomarkr-onboarded', 'true');
+    setShowLandingPage(false);
+    setIsFirstRun(false);
+    // Enable demo mode
+    forceDemoMode();
+    // Navigate to home - demo data should already be available
+    navigate('/');
+  };
+
+  const handleDismissLanding = () => {
+    localStorage.setItem('biomarkr-seen-landing', 'true');
+    setShowLandingPage(false);
+    // Don't set onboarded, so user will see onboarding
+    setIsFirstRun(true);
+    navigate('/');
+  };
+
   const handleOnboardingComplete = () => {
     localStorage.setItem('biomarkr-onboarded', 'true');
     setIsFirstRun(false);
-    
-    // If demo mode was enabled, reload the page to ensure all demo data is loaded properly
-    if (isDemoMode()) {
-      // Small delay to ensure localStorage is written before reload
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    }
   };
 
   // Vault management functions
@@ -298,72 +355,101 @@ function App() {
     setAutoLockMinutes(minutes);
   };
 
+  // Show landing page for completely new users
+  if (showLandingPage) {
+    return (
+      <Routes>
+        <Route path="/welcome" element={
+          <LandingPage 
+            onGetStarted={() => {
+              handleGetStarted();
+              navigate('/onboarding');
+            }} 
+            onStartDemo={() => {
+              handleStartDemo();
+            }} 
+            onDismiss={() => {
+              handleDismissLanding();
+              navigate('/onboarding');
+            }} 
+          />
+        } />
+        <Route path="/*" element={
+          <LandingPage 
+            onGetStarted={() => {
+              handleGetStarted();
+              navigate('/onboarding');
+            }} 
+            onStartDemo={() => {
+              handleStartDemo();
+            }} 
+            onDismiss={() => {
+              handleDismissLanding();
+              navigate('/onboarding');
+            }} 
+          />
+        } />
+      </Routes>
+    );
+  }
+
   // Show onboarding for first-time users
   if (isFirstRun) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <Routes>
+        <Route path="/onboarding" element={
+          <Onboarding 
+            onComplete={() => {
+              handleOnboardingComplete();
+              navigate('/');
+            }} 
+            onClose={() => {
+              // Clear the first-run state and go back to welcome
+              setIsFirstRun(false);
+              setShowLandingPage(true);
+              navigate('/welcome');
+            }}
+          />
+        } />
+        <Route path="/*" element={
+          <Onboarding 
+            onComplete={() => {
+              handleOnboardingComplete();
+              navigate('/');
+            }} 
+            onClose={() => {
+              // Clear the first-run state and go back to welcome
+              setIsFirstRun(false);
+              setShowLandingPage(true);
+              navigate('/welcome');
+            }}
+          />
+        } />
+      </Routes>
+    );
   }
 
   // Show vault manager if locked
   if (isVaultLocked) {
     return (
-      <VaultManager
-        isLocked={true}
-        hasPassphrase={hasPassphrase}
-        autoLockEnabled={autoLockEnabled}
-        autoLockMinutes={autoLockMinutes}
-        onUnlock={handleUnlock}
-        onLock={() => setIsVaultLocked(true)}
-        onSetPassphrase={handleSetPassphrase}
-        onRemovePassphrase={handleRemovePassphrase}
-        onUpdateAutoLock={handleUpdateAutoLock}
-      />
+      <Routes>
+        <Route path="/*" element={
+          <VaultManager
+            isLocked={true}
+            hasPassphrase={hasPassphrase}
+            autoLockEnabled={autoLockEnabled}
+            autoLockMinutes={autoLockMinutes}
+            onUnlock={handleUnlock}
+            onLock={() => setIsVaultLocked(true)}
+            onSetPassphrase={handleSetPassphrase}
+            onRemovePassphrase={handleRemovePassphrase}
+            onUpdateAutoLock={handleUpdateAutoLock}
+          />
+        } />
+      </Routes>
     );
   }
 
-  const renderContent = () => {
-    // Filter test results by current profile
-    const filteredTestResults = testResults.filter(result => 
-      !result.profileId || result.profileId === currentProfileId
-    );
-    
-    // Debug: Profile filtering working correctly
-
-    switch (currentSection) {
-      case 'home':
-        return <HomeScreen testResults={filteredTestResults} currentProfileId={currentProfileId} />;
-      case 'results':
-        return <ResultsScreen testResults={filteredTestResults} onAddResult={() => setShowAddWizard(true)} />;
-      case 'trends':
-        return <TrendsScreen currentProfileId={currentProfileId} />;
-      case 'reminders':
-        return <RemindersScreen currentProfileId={currentProfileId} showAlert={showAlert} />;
-      case 'storage':
-        return <StorageScreen 
-          hasPassphrase={hasPassphrase}
-          autoLockEnabled={autoLockEnabled}
-          autoLockMinutes={autoLockMinutes}
-          onSetPassphrase={handleSetPassphrase}
-          onRemovePassphrase={handleRemovePassphrase}
-          onUpdateAutoLock={handleUpdateAutoLock}
-          onUnlock={handleUnlock}
-          showAlert={showAlert}
-        />;
-      case 'settings':
-        return <SettingsScreen 
-          hasPassphrase={hasPassphrase}
-          autoLockEnabled={autoLockEnabled}
-          autoLockMinutes={autoLockMinutes}
-          onSetPassphrase={handleSetPassphrase}
-          onRemovePassphrase={handleRemovePassphrase}
-          onUpdateAutoLock={handleUpdateAutoLock}
-          onOpenProfileManager={() => setShowProfileManager(true)}
-          onLock={() => setIsVaultLocked(true)}
-          showAlert={showAlert}
-        />;
-      default:
-        return <HomeScreen testResults={testResults} />;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -372,7 +458,7 @@ function App() {
         <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto bg-white dark:bg-gray-800 shadow-sm">
           <div className="flex items-center flex-shrink-0 px-4">
             <button 
-              onClick={() => setCurrentSection('home')}
+              onClick={() => navigate('/')}
               className="flex items-center hover:opacity-80 transition-opacity"
             >
               <Activity className="h-8 w-8 text-blue-600 drop-shadow-sm" />
@@ -393,7 +479,7 @@ function App() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setCurrentSection(item.id as Section)}
+                    onClick={() => navigate(item.id === 'home' ? '/' : `/${item.id}`)}
                     className={`${
                       currentSection === item.id
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-r-2 border-blue-500 text-blue-700 dark:text-blue-400'
@@ -427,7 +513,7 @@ function App() {
           <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between h-16 px-4 border-b">
               <button 
-                onClick={() => setCurrentSection('home')}
+                onClick={() => navigate('/')}
                 className="flex items-center hover:opacity-80 transition-opacity"
               >
                 <Activity className="h-8 w-8 text-blue-600 drop-shadow-sm" />
@@ -451,7 +537,7 @@ function App() {
                   <button
                     key={item.id}
                     onClick={() => {
-                      setCurrentSection(item.id as Section);
+                      navigate(item.id === 'home' ? '/' : `/${item.id}`);
                       setIsMobileMenuOpen(false);
                     }}
                     className={`${
@@ -592,7 +678,55 @@ function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 text-gray-900 dark:text-white">
-          {renderContent()}
+          <Routes>
+            <Route path="/" element={
+              <HomeScreen 
+                testResults={testResults.filter(result => 
+                  !result.profileId || result.profileId === currentProfileId
+                )} 
+                currentProfileId={currentProfileId} 
+              />
+            } />
+            <Route path="/results" element={
+              <ResultsScreen 
+                testResults={testResults.filter(result => 
+                  !result.profileId || result.profileId === currentProfileId
+                )} 
+                onAddResult={() => setShowAddWizard(true)} 
+              />
+            } />
+            <Route path="/trends" element={
+              <TrendsScreen currentProfileId={currentProfileId} />
+            } />
+            <Route path="/reminders" element={
+              <RemindersScreen currentProfileId={currentProfileId} showAlert={showAlert} />
+            } />
+            <Route path="/storage" element={
+              <StorageScreen 
+                hasPassphrase={hasPassphrase}
+                autoLockEnabled={autoLockEnabled}
+                autoLockMinutes={autoLockMinutes}
+                onSetPassphrase={handleSetPassphrase}
+                onRemovePassphrase={handleRemovePassphrase}
+                onUpdateAutoLock={handleUpdateAutoLock}
+                onUnlock={handleUnlock}
+                showAlert={showAlert}
+              />
+            } />
+            <Route path="/settings" element={
+              <SettingsScreen 
+                hasPassphrase={hasPassphrase}
+                autoLockEnabled={autoLockEnabled}
+                autoLockMinutes={autoLockMinutes}
+                onSetPassphrase={handleSetPassphrase}
+                onRemovePassphrase={handleRemovePassphrase}
+                onUpdateAutoLock={handleUpdateAutoLock}
+                onOpenProfileManager={() => setShowProfileManager(true)}
+                onLock={() => setIsVaultLocked(true)}
+                showAlert={showAlert}
+              />
+            } />
+          </Routes>
         </main>
 
         {/* Mobile Bottom Navigation */}
@@ -603,7 +737,7 @@ function App() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setCurrentSection(item.id as Section)}
+                  onClick={() => navigate(item.id === 'home' ? '/' : `/${item.id}`)}
                   className={`${
                     currentSection === item.id
                       ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
@@ -664,6 +798,8 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
   const latestResult = testResults[0];
   const { formatDate } = useSettings();
   const [reminders, setReminders] = useState([]);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfUse, setShowTermsOfUse] = useState(false);
   
   // Load reminders for this profile
   useEffect(() => {
@@ -726,10 +862,131 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
   
   const quickTrends = getQuickTrends();
   
+  // Features data
+  const features = [
+    {
+      icon: <Heart className="w-6 h-6" />,
+      title: "Comprehensive Health Tracking",
+      description: "Track 70+ biomarkers across 17+ test panel types covering all major health systems including cardiovascular, metabolic, hormonal, and nutritional markers.",
+      color: "text-red-500"
+    },
+    {
+      icon: <Shield className="w-6 h-6" />,
+      title: "Privacy-First Architecture",
+      description: "Your data never leaves your device. 100% local storage with optional vault protection using client-side encryption. No accounts required.",
+      color: "text-green-500"
+    },
+    {
+      icon: <TrendingUp className="w-6 h-6" />,
+      title: "Advanced Analytics",
+      description: "Interactive charts, trend analysis, and pattern recognition help you understand your health journey over time.",
+      color: "text-blue-500"
+    },
+    {
+      icon: <Users className="w-6 h-6" />,
+      title: "Multi-Profile Support",
+      description: "Manage health data for your entire family with separate profiles for each member, including children and adults.",
+      color: "text-purple-500"
+    },
+    {
+      icon: <Cloud className="w-6 h-6" />,
+      title: "Optional Cloud Backup",
+      description: "Secure encrypted backups to Google Drive, Dropbox, or OneDrive. Your choice, your control.",
+      color: "text-cyan-500"
+    },
+    {
+      icon: <Download className="w-6 h-6" />,
+      title: "Data Export & Portability",
+      description: "Export your data to PDF, CSV, or JSON formats. Your data belongs to you, take it anywhere.",
+      color: "text-orange-500"
+    }
+  ];
+  
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border border-blue-200 dark:border-gray-700">
+        <div className="flex items-center space-x-4 mb-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+            <Activity className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Welcome to Biomarkr
+              {isDemoMode() && (
+                <span className="ml-2 text-sm font-normal bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full">
+                  DEMO MODE
+                </span>
+              )}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Your comprehensive, privacy-first personal health data management system
+            </p>
+          </div>
+        </div>
+        <p className="text-gray-700 dark:text-gray-300">
+          Track, analyze, and understand your biomarker test results over time. 
+          Get insights from your health data while maintaining complete privacy and control.
+        </p>
+      </div>
+
+      {/* Quick Stats */}
+      {testResults.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center space-x-3">
+              <FileText className="w-8 h-8 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{testResults.length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Test Results</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center space-x-3">
+              <TrendingUp className="w-8 h-8 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{quickTrends.length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Active Trends</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center space-x-3">
+              <Bell className="w-8 h-8 text-orange-500" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{reminders.length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Upcoming Reminders</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Features Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Latest Results</h3>
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Biomarkr Features</h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((feature, index) => (
+            <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow">
+              <div className={`${feature.color} mb-3`}>
+                {feature.icon}
+              </div>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                {feature.title}
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Latest Results & Quick Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Latest Results</h3>
         {latestResult ? (
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -738,7 +995,7 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
             </div>
             <h4 className="font-medium text-gray-900 dark:text-white mb-2">{latestResult.panel}</h4>
             <div className="space-y-2">
-              {latestResult.biomarkers.map((marker, index) => (
+              {latestResult.biomarkers.slice(0, 3).map((marker, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <span className="text-sm text-gray-700 dark:text-gray-300">{marker.name}</span>
                   <div className="text-right">
@@ -749,6 +1006,13 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
                   </div>
                 </div>
               ))}
+              {latestResult.biomarkers.length > 3 && (
+                <div className="text-center pt-2">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    +{latestResult.biomarkers.length - 3} more results
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -758,6 +1022,7 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
             <p className="text-sm">Add your first lab result to get started</p>
           </div>
         )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -824,15 +1089,54 @@ function HomeScreen({ testResults, currentProfileId }: { testResults: TestResult
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Not Medical Advice</p>
-            <p>This information is for tracking purposes only. Always consult healthcare professionals for medical interpretation and advice.</p>
+      {/* Legal & Info Section */}
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Privacy & Legal Information</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Learn about our privacy practices and terms of use
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => setShowPrivacyPolicy(true)}
+              className="px-4 py-2 text-green-600 dark:text-green-400 border border-green-600 dark:border-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-sm font-medium"
+            >
+              <Shield className="w-4 h-4 inline mr-2" />
+              Privacy Policy
+            </button>
+            <button
+              onClick={() => setShowTermsOfUse(true)}
+              className="px-4 py-2 text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm font-medium"
+            >
+              <Scale className="w-4 h-4 inline mr-2" />
+              Terms of Use
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Medical Disclaimer */}
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+        <div className="flex items-start">
+          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0" />
+          <div className="text-sm text-amber-800 dark:text-amber-200">
+            <p className="font-medium mb-1">Medical Disclaimer</p>
+            <p>Biomarkr is a personal health tracking tool and is not intended to diagnose, treat, cure, or prevent any disease. Always consult with qualified healthcare professionals for medical advice and interpretation of your health data.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <PrivacyPolicyModal 
+        isOpen={showPrivacyPolicy} 
+        onClose={() => setShowPrivacyPolicy(false)} 
+      />
+      <TermsOfUseModal 
+        isOpen={showTermsOfUse} 
+        onClose={() => setShowTermsOfUse(false)} 
+      />
     </div>
   );
 }

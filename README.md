@@ -15,6 +15,7 @@
 - **70+ Biomarkers** including cardiovascular, metabolic, hormonal, and nutritional markers
 - **Multi-Profile Support** for family health management
 - **Trend Analysis** with interactive charts and pattern recognition
+- **Professional Landing Page** with feature overview and setup instructions
 
 ### 🔐 **Privacy-First Architecture**
 - **100% Local Storage** - Your data never leaves your device
@@ -55,6 +56,8 @@ npm run preview
 ```
 
 Visit `http://localhost:5173` to access Biomarkr in your browser.
+
+> 🎉 **New User Experience**: First-time visitors will see a comprehensive landing page showcasing all features, privacy policies, and self-hosting instructions before accessing the application.
 
 ### 🖥️ **Desktop Application (Electron)**
 
@@ -188,7 +191,10 @@ biomarkr-app/
 - **localStorage** - Primary data storage
 - **IndexedDB** - Large data storage (future)
 - **Web Crypto API** - Client-side encryption
-- **Cloud Storage APIs** - Optional backup (Google Drive, Dropbox)
+- **Cloud Storage APIs** - Optional encrypted backup
+  - ✅ **Dropbox** - Full OAuth2 + PKCE implementation
+  - ✅ **OneDrive** - Microsoft Graph API integration
+  - ✅ **Google Drive** - OAuth2 + Drive API v3
 
 ### **Charts & Visualization**
 - **Chart.js/React-Chartjs-2** - Interactive charts
@@ -272,6 +278,14 @@ Biomarkr is a personal health tracking tool and is not intended to diagnose, tre
 - [ ] Custom reference ranges for personalized medicine
 - [ ] Data correlation analysis between biomarkers
 - [ ] Risk scoring and health predictions
+
+#### **☁️ Cloud Storage Expansion**
+- [ ] **Box** - Enterprise cloud storage integration
+- [ ] **iCloud Drive** - Apple ecosystem integration
+- [ ] **pCloud** - European privacy-focused storage
+- [ ] **MEGA** - End-to-end encrypted storage
+- [ ] **Nextcloud** - Self-hosted cloud storage
+- [ ] **Custom S3** - Amazon S3 compatible storage
 
 #### **🔗 Integrations**
 - [ ] Wearable device data import (Apple Watch, Fitbit, Oura)

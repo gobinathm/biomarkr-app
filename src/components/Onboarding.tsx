@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Activity,
   Shield, 
   Lock, 
   Key, 
@@ -19,19 +20,19 @@ import {
   RefreshCw,
   Upload,
   Plus,
-  PlayCircle
+  X
 } from 'lucide-react';
 import { CloudStorageManager, CloudProvider, cloudStorageManager } from '../services/cloudStorageManager';
 import { getAvailableProviders } from '../utils/providerValidation';
-import { enableDemoMode } from '../data/mockData';
 
 interface OnboardingProps {
   onComplete: () => void;
+  onClose?: () => void;
 }
 
 type OnboardingStep = 'welcome' | 'vault-choice' | 'backup-check' | 'vault-setup' | 'passphrase' | 'cloud-choice' | 'complete';
 
-export function Onboarding({ onComplete }: OnboardingProps) {
+export function Onboarding({ onComplete, onClose }: OnboardingProps) {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
@@ -107,11 +108,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               onComplete();
             }}
             onCheckForBackups={() => setCurrentStep('backup-check')}
-            onDemoMode={() => {
-              // Enable demo mode and complete onboarding
-              enableDemoMode();
-              onComplete();
-            }}
             onBack={() => setCurrentStep('welcome')}
           />
         );
@@ -165,7 +161,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
+      <div className="max-w-2xl w-full relative">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-white/80 rounded-full transition-all duration-200 shadow-md hover:shadow-lg z-20 bg-white/60 backdrop-blur-sm"
+            title="Back to welcome"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        )}
         {renderStep()}
       </div>
     </div>
@@ -176,11 +181,19 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
       <div className="mb-8">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6">
-          <Shield className="w-10 h-10 text-blue-600" />
+        <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full mb-6 shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-200/50 to-emerald-200/50 rounded-full animate-pulse"></div>
+          <Shield className="w-12 h-12 text-green-600 dark:text-green-400 relative z-10" />
+          <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+            <Lock className="w-3 h-3 text-white" />
+          </div>
         </div>
         <h1 className="text-3xl font-display font-bold text-gray-900 mb-4">
-          Welcome to <span className="bg-logo-gradient bg-clip-text text-transparent">Biomarkr</span>
+          Welcome to 
+          <span className="inline-flex items-center">
+            <Activity className="h-8 w-8 text-blue-600 mr-2 ml-2" />
+            <span className="bg-logo-gradient bg-clip-text text-transparent">Biomarkr</span>
+          </span>
         </h1>
         <p className="text-lg text-gray-600 mb-6">
           Your personal, private lab results tracker that keeps your health data secure and under your control.
@@ -211,13 +224,28 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
         <div className="flex items-start">
           <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
           <div className="text-left">
             <p className="text-sm font-medium text-blue-900 mb-1">Your Privacy Promise</p>
             <p className="text-sm text-blue-800">
               No cloud by default. Your device holds your data. We never see your health information.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mb-8">
+        <div className="flex items-start">
+          <AlertTriangle className="w-6 h-6 text-amber-600 mt-0.5 mr-3 flex-shrink-0" />
+          <div className="text-left">
+            <p className="text-sm font-bold text-amber-900 mb-2">Important: Your Data Storage</p>
+            <p className="text-sm text-amber-800 mb-2">
+              <strong>All your health data is stored in your browser.</strong> If you clear browser data, cookies, or use incognito mode, you will lose all your information.
+            </p>
+            <p className="text-sm text-amber-800">
+              <strong>We strongly recommend setting up cloud backup</strong> during setup to protect your data.
             </p>
           </div>
         </div>
@@ -399,17 +427,30 @@ function PassphraseStep({
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+      <div className="bg-gradient-to-r from-amber-50 to-red-50 dark:from-amber-900/30 dark:to-red-900/30 border-2 border-amber-400 dark:border-amber-500 rounded-xl p-6 mb-8 shadow-lg">
         <div className="flex items-start">
-          <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-blue-900 mb-1">Recovery Limitation</p>
-            <p className="text-sm text-blue-800">
-              {skipPassphrase 
-                ? "Without a passphrase, your vault can only be recovered if you've backed it up to a cloud drive."
-                : "If you forget your passphrase, your vault can only be recovered from a cloud backup. We cannot reset it for you."
-              }
-            </p>
+          <div className="flex-shrink-0 mr-4">
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 animate-pulse" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center mb-3">
+              <h4 className="text-lg font-bold text-amber-900 dark:text-amber-100 mr-2">
+                CRITICAL: Recovery Limitation
+              </h4>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-200 dark:border-amber-700">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                {skipPassphrase 
+                  ? "🔒 Without a passphrase, your vault can ONLY be recovered if you've backed it up to a cloud drive."
+                  : "🔐 If you forget your passphrase, your vault can ONLY be recovered from a cloud backup. We CANNOT reset it for you."
+                }
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                💡 <strong>Recommendation:</strong> Set up cloud backup in the next step to prevent permanent data loss.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -614,11 +655,10 @@ interface VaultChoiceStepProps {
   onCreateNew: () => void;
   onRestoreFromBackup: () => void;
   onCheckForBackups: () => void;
-  onDemoMode: () => void;
   onBack: () => void;
 }
 
-function VaultChoiceStep({ hasCloudBackups, checkingBackups, onCreateNew, onRestoreFromBackup, onCheckForBackups, onDemoMode, onBack }: VaultChoiceStepProps) {
+function VaultChoiceStep({ hasCloudBackups, checkingBackups, onCreateNew, onRestoreFromBackup, onCheckForBackups, onBack }: VaultChoiceStepProps) {
   if (checkingBackups) {
     return (
       <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -685,24 +725,6 @@ function VaultChoiceStep({ hasCloudBackups, checkingBackups, onCreateNew, onRest
             </div>
           </div>
 
-          {/* Demo mode option */}
-          <div className="p-6 border-2 border-purple-200 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer group" onClick={onDemoMode}>
-            <div className="flex items-start">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mr-4 group-hover:bg-purple-200">
-                <PlayCircle className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 mb-2">Try Demo Mode</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  Explore Biomarkr with pre-loaded sample data to see how it works.
-                </p>
-                <div className="flex items-center text-sm text-purple-700">
-                  <PlayCircle className="w-4 h-4 mr-1" />
-                  <span>Perfect for testing the app</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="flex space-x-4">
@@ -774,24 +796,6 @@ function VaultChoiceStep({ hasCloudBackups, checkingBackups, onCreateNew, onRest
           </div>
         </div>
 
-        {/* Demo mode option */}
-        <div className="p-6 border-2 border-purple-200 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer group" onClick={onDemoMode}>
-          <div className="flex items-start">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mr-4 group-hover:bg-purple-200">
-              <PlayCircle className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-2">Try Demo Mode</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Explore Biomarkr with pre-loaded sample data to see how it works.
-              </p>
-              <div className="flex items-center text-sm text-purple-700">
-                <PlayCircle className="w-4 h-4 mr-1" />
-                <span>Perfect for testing the app</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">

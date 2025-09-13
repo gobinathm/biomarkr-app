@@ -7,4 +7,23 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // Configure for client-side routing (SPA)
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom']
+        }
+      }
+    }
+  },
+  // Handle client-side routing in dev mode
+  server: {
+    historyApiFallback: true
+  },
+  // Handle client-side routing in preview mode
+  preview: {
+    historyApiFallback: true
+  }
 });
