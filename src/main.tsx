@@ -5,9 +5,11 @@ import App from './App.tsx';
 import './index.css';
 import { SettingsProvider } from './contexts/SettingsContext.tsx';
 
+const basename = import.meta.env.PROD ? '/biomarkr-app' : '';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <SettingsProvider>
         <App />
       </SettingsProvider>
